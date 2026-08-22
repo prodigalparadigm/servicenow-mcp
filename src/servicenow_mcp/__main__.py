@@ -8,17 +8,34 @@ breaks the JSON-RPC framing and the client disconnects with an opaque error.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 
-from .app import build_from_env
+from .app import Application, build_application
 from .config import Settings
 from .errors import ConfigurationError
+
+
+async def _serve(app: Application) -> None:
+    """Serve stdio until the client disconnects, then release the HTTP client.
+
+    ``MCPServer.run`` is synchronous and owns its own event loop, so it is not
+    used here: closing the ``httpx`` client has to happen on the loop its
+    connections were opened on, and that loop must still be alive.
+    """
+    try:
+        await app.server.run_stdio_async()
+    finally:
+        await app.aclose()
 
 
 def main() -> int:
     """Start the server on stdio. Returns a process exit code."""
     try:
+        # Read and validate the environment exactly once, then build from the
+        # object -- so the running server cannot disagree with the banner.
         settings = Settings.from_env()
+        app = build_application(settings)
     except ConfigurationError as exc:
         print(f"servicenow-mcp: configuration error: {exc}", file=sys.stderr)
         print(
@@ -27,7 +44,6 @@ def main() -> int:
         )
         return 2
 
-    app = build_from_env()
     mode = "read-only" if settings.read_only else "READ-WRITE"
     print(
         f"servicenow-mcp: {settings.instance_url} "
@@ -36,7 +52,7 @@ def main() -> int:
         file=sys.stderr,
     )
     try:
-        app.server.run(transport="stdio")
+        asyncio.run(_serve(app))
     except KeyboardInterrupt:  # pragma: no cover - interactive only
         return 130
     return 0
