@@ -23,6 +23,8 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
 ]
 
 [project.scripts]
@@ -38,6 +40,40 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/servicenow_mcp"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+# Explicit rather than default so `ruff check` means the same thing for a
+# reviewer as it does here.
+select = [
+    "F",    # pyflakes
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplifications
+    "ARG",  # unused arguments
+    "BLE",  # blind excepts
+    "S",    # bandit-style security checks
+    "RUF",
+]
+ignore = [
+    "S101",  # asserts are how tests assert
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The fake instance and the stdio harness deliberately imitate a real server:
+# hardcoded localhost binds and fixture passwords are the point.
+"tests/*" = ["S104", "S105", "S106", "S107", "S311", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/servicenow_mcp"]
+strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
