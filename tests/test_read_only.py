@@ -28,7 +28,7 @@ async def test_mutating_tools_are_not_advertised_when_read_only(make_app):
     app = make_app(read_only=True)
     names = {t.name for t in await app.server.list_tools()}
 
-    assert READ_TOOLS <= names
+    assert names >= READ_TOOLS
     assert not (WRITE_TOOLS & names)
 
 
@@ -36,8 +36,8 @@ async def test_mutating_tools_appear_when_writes_are_enabled(make_app):
     app = make_app(read_only=False)
     names = {t.name for t in await app.server.list_tools()}
 
-    assert WRITE_TOOLS <= names
-    assert READ_TOOLS <= names
+    assert names >= WRITE_TOOLS
+    assert names >= READ_TOOLS
 
 
 async def test_service_refuses_create_even_if_called_directly(make_service, fake):

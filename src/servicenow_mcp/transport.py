@@ -36,7 +36,7 @@ from .errors import (
     TransportError,
 )
 
-__all__ = ["RetryPolicy", "TokenBucket", "ServiceNowTransport"]
+__all__ = ["RetryPolicy", "ServiceNowTransport", "TokenBucket"]
 
 #: Statuses worth retrying for a read.
 _RETRYABLE_READ_STATUSES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
@@ -160,7 +160,9 @@ class ServiceNowTransport:
             settings.rate_limit_per_minute, sleep=sleep
         )
         self._sleep = sleep
-        self._rng = rng or random.Random()
+        # Jitter, not a secret: `random` is the right tool and a seeded
+        # instance is what makes the retry tests deterministic.
+        self._rng = rng or random.Random()  # noqa: S311
         self.stats = TransportStats()
 
     @property

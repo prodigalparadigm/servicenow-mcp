@@ -39,7 +39,9 @@ async def test_every_tool_is_advertised_with_a_schema_and_description(make_app):
 
 async def test_search_incidents_schema_exposes_the_filter_parameters(make_app):
     app = make_app()
-    tool = next(t for t in await app.server.list_tools() if t.name == "search_incidents")
+    tool = next(
+        t for t in await app.server.list_tools() if t.name == "search_incidents"
+    )
 
     properties = tool.input_schema["properties"]
     for name in ("text", "state", "priority", "assignment_group", "limit", "offset"):
@@ -137,7 +139,7 @@ async def test_call_server_info(make_app):
 async def test_calling_a_mutating_tool_in_read_only_mode_is_a_tool_error(make_app):
     app = make_app(read_only=True)
 
-    with pytest.raises(ToolError, match="Unknown tool|read-only"):
+    with pytest.raises(ToolError, match=r"Unknown tool|read-only"):
         await app.server.call_tool(
             "create_incident", {"short_description": "should not exist"}
         )
@@ -249,7 +251,9 @@ async def test_state_filter_accepts_labels_and_numbers(make_app):
     app = make_app()
 
     by_label = payload(
-        await app.server.call_tool("search_incidents", {"state": "resolved", "limit": 50})
+        await app.server.call_tool(
+            "search_incidents", {"state": "resolved", "limit": 50}
+        )
     )
     by_number = payload(
         await app.server.call_tool("search_incidents", {"state": "6", "limit": 50})
@@ -296,7 +300,8 @@ async def test_extra_query_is_the_documented_escape_hatch(make_app, fake):
     app = make_app()
     body = payload(
         await app.server.call_tool(
-            "search_incidents", {"extra_query": "category=network^priority=3", "limit": 50}
+            "search_incidents",
+            {"extra_query": "category=network^priority=3", "limit": 50},
         )
     )
 
@@ -308,14 +313,18 @@ async def test_extra_query_is_the_documented_escape_hatch(make_app, fake):
 async def test_active_only_filter(make_app):
     app = make_app()
     body = payload(
-        await app.server.call_tool("search_incidents", {"active_only": True, "limit": 50})
+        await app.server.call_tool(
+            "search_incidents", {"active_only": True, "limit": 50}
+        )
     )
     assert 0 < body["count"] < 25
 
 
 async def test_text_filter_matches_short_description(make_app):
     app = make_app()
-    hit = payload(await app.server.call_tool("search_incidents", {"text": "VPN", "limit": 50}))
+    hit = payload(
+        await app.server.call_tool("search_incidents", {"text": "VPN", "limit": 50})
+    )
     miss = payload(await app.server.call_tool("search_incidents", {"text": "zzz"}))
 
     assert hit["count"] == 25

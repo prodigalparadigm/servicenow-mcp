@@ -17,7 +17,7 @@ from typing import Any, Final
 
 from .errors import ServiceNowMCPError
 
-__all__ = ["QueryBuilder", "sanitize_operand", "QuerySyntaxError"]
+__all__ = ["QueryBuilder", "QuerySyntaxError", "sanitize_operand"]
 
 #: Characters that terminate or restructure a term. There is no escape for
 #: them in the encoded-query grammar, so operands containing them are rejected

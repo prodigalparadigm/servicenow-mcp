@@ -9,10 +9,7 @@ from servicenow_mcp.query import QueryBuilder, QuerySyntaxError, sanitize_operan
 
 def test_conditions_are_joined_with_the_and_delimiter():
     query = (
-        QueryBuilder()
-        .where("active", "=", True)
-        .where("priority", "<=", 2)
-        .render()
+        QueryBuilder().where("active", "=", True).where("priority", "<=", 2).render()
     )
     assert query == "active=true^priority<=2"
 
@@ -38,11 +35,15 @@ def test_order_by_spec_shorthand():
 
 
 def test_unary_operators_take_no_operand():
-    assert QueryBuilder().where("assigned_to", "ISEMPTY").render() == "assigned_toISEMPTY"
+    assert (
+        QueryBuilder().where("assigned_to", "ISEMPTY").render() == "assigned_toISEMPTY"
+    )
 
 
 def test_dotted_reference_walks_are_allowed():
-    query = QueryBuilder().where("assignment_group.name", "=", "Network Support").render()
+    query = (
+        QueryBuilder().where("assignment_group.name", "=", "Network Support").render()
+    )
     assert query == "assignment_group.name=Network Support"
 
 
@@ -88,7 +89,9 @@ def test_invalid_field_names_are_rejected(field):
 
 
 def test_raw_is_the_only_path_that_accepts_a_delimiter():
-    query = QueryBuilder().where("active", "=", True).raw("^priority=1^ORstate=2").render()
+    query = (
+        QueryBuilder().where("active", "=", True).raw("^priority=1^ORstate=2").render()
+    )
     assert query == "active=true^priority=1^ORstate=2"
 
 

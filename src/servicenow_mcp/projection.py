@@ -10,9 +10,9 @@ wrong for two independent reasons:
 2. **Data minimisation.** Incident records routinely carry caller phone
    numbers, free-text descriptions with account identifiers, and attachment
    metadata. An allowlist is an auditable, reviewable statement of exactly
-   what leaves the customer's boundary -- something a security review can read
-   in one screen. A denylist is not, because the next plugin install adds
-   columns nobody vetted.
+   which columns leave the instance -- something a security review can read in
+   one screen. A denylist is not, because the next plugin install adds columns
+   nobody vetted.
 
 The allowlists are also pushed down to the wire as ``sysparm_fields``, so the
 unwanted columns are never transferred at all rather than fetched and dropped.
@@ -24,10 +24,10 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Final
 
 __all__ = [
-    "INCIDENT_SUMMARY_FIELDS",
-    "INCIDENT_DETAIL_FIELDS",
     "ASSIGNMENT_GROUP_FIELDS",
     "CMDB_CI_FIELDS",
+    "INCIDENT_DETAIL_FIELDS",
+    "INCIDENT_SUMMARY_FIELDS",
     "TRUNCATION_SUFFIX",
     "project_record",
     "project_records",
@@ -54,7 +54,8 @@ INCIDENT_SUMMARY_FIELDS: Final[tuple[str, ...]] = (
 
 #: Returned by ``get_incident``. Adds the narrative fields, which are worth
 #: their token cost for exactly one record at a time.
-INCIDENT_DETAIL_FIELDS: Final[tuple[str, ...]] = INCIDENT_SUMMARY_FIELDS + (
+INCIDENT_DETAIL_FIELDS: Final[tuple[str, ...]] = (
+    *INCIDENT_SUMMARY_FIELDS,
     "description",
     "close_code",
     "close_notes",
@@ -126,7 +127,9 @@ def _coerce_scalar(value: Any) -> Any:
         for key in ("display_value", "value", "link"):
             if key in value:
                 inner = value[key]
-                return inner if isinstance(inner, (str, int, float, bool)) else str(inner)
+                return (
+                    inner if isinstance(inner, (str, int, float, bool)) else str(inner)
+                )
         return ""
     if value is None:
         return ""

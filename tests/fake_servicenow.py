@@ -22,6 +22,7 @@ response validation execute in tests as in production.
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -31,7 +32,14 @@ from urllib.parse import parse_qs, urlencode
 
 import httpx
 
-__all__ = ["Ref", "Fault", "FakeServiceNow", "make_incidents", "make_groups", "make_cis"]
+__all__ = [
+    "FakeServiceNow",
+    "Fault",
+    "Ref",
+    "make_cis",
+    "make_groups",
+    "make_incidents",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,10 +302,10 @@ class FakeServiceNow:
         header = request.headers.get("Authorization", "")
         if header.startswith("Basic "):
             try:
-                decoded = base64.b64decode(header[6:]).decode("utf-8")
-                user, _, pwd = decoded.partition(":")
-            except Exception:
+                decoded = base64.b64decode(header[6:], validate=True).decode("utf-8")
+            except (binascii.Error, UnicodeDecodeError):
                 return self._error(401, "Malformed basic credentials")
+            user, _, pwd = decoded.partition(":")
             if user == self.username and pwd == self.password:
                 return None
             return self._error(401, "User Not Authenticated")
@@ -312,9 +320,7 @@ class FakeServiceNow:
 
     # -- table operations -----------------------------------------------
 
-    def _query(
-        self, table: str, params: Mapping[str, list[str]]
-    ) -> httpx.Response:
+    def _query(self, table: str, params: Mapping[str, list[str]]) -> httpx.Response:
         rows = self.tables.get(table, [])
         encoded = _first(params, "sysparm_query") or ""
         matched, order = _apply_query(rows, encoded)
@@ -415,7 +421,9 @@ class FakeServiceNow:
                     if journal in updates:
                         prior = _raw(row.get(journal))
                         updates[journal] = (
-                            f"{prior}\n{updates[journal]}" if prior else updates[journal]
+                            f"{prior}\n{updates[journal]}"
+                            if prior
+                            else updates[journal]
                         )
                 row.update(updates)
                 row["sys_updated_on"] = "2026-08-22 13:00:00"

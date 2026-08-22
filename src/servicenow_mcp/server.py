@@ -19,7 +19,7 @@ from mcp.types import ToolAnnotations
 from .config import Settings
 from .service import ServiceNowService
 
-__all__ = ["build_server", "SERVER_INSTRUCTIONS"]
+__all__ = ["SERVER_INSTRUCTIONS", "build_server"]
 
 SERVER_INSTRUCTIONS = """\
 Tools for a ServiceNow ITSM instance: incidents, assignment groups, and CMDB \

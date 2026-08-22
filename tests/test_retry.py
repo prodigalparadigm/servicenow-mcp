@@ -29,9 +29,7 @@ async def test_429_is_retried_and_then_succeeds(fake, sleeper):
     fake.fail_next(2, status=429, retry_after="1")
     client = _client(fake, sleeper, max_retries=3)
 
-    page = await client.query_table(
-        "incident", fields=INCIDENT_SUMMARY_FIELDS, limit=5
-    )
+    page = await client.query_table("incident", fields=INCIDENT_SUMMARY_FIELDS, limit=5)
 
     assert len(page.records) == 5
     assert client.transport.stats.rate_limit_hits == 2
@@ -96,9 +94,7 @@ async def test_503_is_retried_for_reads(fake, sleeper):
     fake.fail_next(1, status=503)
     client = _client(fake, sleeper, max_retries=2)
 
-    page = await client.query_table(
-        "incident", fields=INCIDENT_SUMMARY_FIELDS, limit=2
-    )
+    page = await client.query_table("incident", fields=INCIDENT_SUMMARY_FIELDS, limit=2)
 
     assert len(page.records) == 2
     assert client.transport.stats.retries == 1
@@ -121,9 +117,7 @@ async def test_timeouts_are_retried_for_reads(fake, sleeper):
     fake.fail_next(2, exception=httpx.ReadTimeout("timed out"))
     client = _client(fake, sleeper, max_retries=3)
 
-    page = await client.query_table(
-        "incident", fields=INCIDENT_SUMMARY_FIELDS, limit=1
-    )
+    page = await client.query_table("incident", fields=INCIDENT_SUMMARY_FIELDS, limit=1)
 
     assert len(page.records) == 1
     assert len(sleeper.calls) == 2
@@ -157,7 +151,8 @@ async def test_write_is_replayed_after_a_connect_error(fake, sleeper):
     client = _client(fake, sleeper, max_retries=3, read_only=False)
 
     record = await client.create_record(
-        "incident", {"short_description": "created after a connect error"},
+        "incident",
+        {"short_description": "created after a connect error"},
         fields=INCIDENT_SUMMARY_FIELDS,
     )
 
@@ -171,7 +166,8 @@ async def test_write_is_retried_on_429(fake, sleeper):
     client = _client(fake, sleeper, max_retries=3, read_only=False)
 
     record = await client.create_record(
-        "incident", {"short_description": "throttled then created"},
+        "incident",
+        {"short_description": "throttled then created"},
         fields=INCIDENT_SUMMARY_FIELDS,
     )
 
@@ -247,7 +243,9 @@ async def test_token_bucket_disabled_at_zero():
     assert bucket.waits == 0
 
 
-async def test_retries_are_counted_per_tool_call_in_the_audit(make_service, fake, audit_stream):
+async def test_retries_are_counted_per_tool_call_in_the_audit(
+    make_service, fake, audit_stream
+):
     import json
 
     fake.fail_next(2, status=429, retry_after="0")

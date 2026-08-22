@@ -30,7 +30,10 @@ async def get(fake: FakeServiceNow, path: str, **params) -> httpx.Response:
 
 async def test_offset_and_limit_slice_the_result_set(raw):
     response = await get(
-        raw, "/api/now/table/incident", sysparm_limit=3, sysparm_offset=4,
+        raw,
+        "/api/now/table/incident",
+        sysparm_limit=3,
+        sysparm_offset=4,
         sysparm_fields="number",
     )
     assert [r["number"] for r in response.json()["result"]] == [
@@ -56,7 +59,9 @@ async def test_link_header_advertises_the_next_offset(raw):
 
 async def test_sysparm_fields_projects_and_pads_missing_columns(raw):
     response = await get(
-        raw, "/api/now/table/incident", sysparm_limit=1,
+        raw,
+        "/api/now/table/incident",
+        sysparm_limit=1,
         sysparm_fields="number,not_a_real_column",
     )
     record = response.json()["result"][0]
@@ -74,19 +79,28 @@ async def test_display_value_modes(raw):
     }
 
     no_link = await get(
-        raw, "/api/now/table/incident", sysparm_limit=1, sysparm_fields="state",
+        raw,
+        "/api/now/table/incident",
+        sysparm_limit=1,
+        sysparm_fields="state",
         sysparm_exclude_reference_link="true",
     )
     assert no_link.json()["result"][0]["state"] == "2"
 
     display = await get(
-        raw, "/api/now/table/incident", sysparm_limit=1, sysparm_fields="state",
+        raw,
+        "/api/now/table/incident",
+        sysparm_limit=1,
+        sysparm_fields="state",
         sysparm_display_value="true",
     )
     assert display.json()["result"][0]["state"] == "In Progress"
 
     both = await get(
-        raw, "/api/now/table/incident", sysparm_limit=1, sysparm_fields="state",
+        raw,
+        "/api/now/table/incident",
+        sysparm_limit=1,
+        sysparm_fields="state",
         sysparm_display_value="all",
     )
     assert both.json()["result"][0]["state"] == {
@@ -121,15 +135,21 @@ async def test_encoded_query_operators(raw, query, expected):
 
 async def test_orderby_ascending_and_descending(raw):
     ascending = await get(
-        raw, "/api/now/table/incident", sysparm_query="ORDERBYnumber",
-        sysparm_fields="number", sysparm_limit=100,
+        raw,
+        "/api/now/table/incident",
+        sysparm_query="ORDERBYnumber",
+        sysparm_fields="number",
+        sysparm_limit=100,
     )
     numbers = [r["number"] for r in ascending.json()["result"]]
     assert numbers == sorted(numbers)
 
     descending = await get(
-        raw, "/api/now/table/incident", sysparm_query="ORDERBYDESCnumber",
-        sysparm_fields="number", sysparm_limit=100,
+        raw,
+        "/api/now/table/incident",
+        sysparm_query="ORDERBYDESCnumber",
+        sysparm_fields="number",
+        sysparm_limit=100,
     )
     assert [r["number"] for r in descending.json()["result"]] == sorted(
         numbers, reverse=True
@@ -148,7 +168,9 @@ async def test_numeric_sort_is_numeric_not_lexical():
         require_auth=False,
     )
     response = await get(
-        fake, "/api/now/table/incident", sysparm_query="ORDERBYpriority",
+        fake,
+        "/api/now/table/incident",
+        sysparm_query="ORDERBYpriority",
         sysparm_fields="number",
     )
     assert [r["number"] for r in response.json()["result"]] == ["C", "B", "A"]

@@ -108,9 +108,7 @@ async def test_offset_past_end_returns_empty_page(make_client):
 
 async def test_zero_limit_makes_no_request(make_client, fake: FakeServiceNow):
     client = make_client()
-    page = await client.query_table(
-        "incident", fields=INCIDENT_SUMMARY_FIELDS, limit=0
-    )
+    page = await client.query_table("incident", fields=INCIDENT_SUMMARY_FIELDS, limit=0)
 
     assert page.records == []
     assert page.requests == 0
@@ -150,7 +148,9 @@ async def test_paging_through_with_next_offset_covers_every_record(make_service)
     seen: list[str] = []
     offset = 0
     for _ in range(20):  # bounded so a paging bug fails instead of hanging
-        result = await service.search_incidents(limit=7, offset=offset, order_by="number")
+        result = await service.search_incidents(
+            limit=7, offset=offset, order_by="number"
+        )
         seen.extend(i["number"] for i in result["incidents"])
         if not result["has_more"]:
             break
@@ -186,7 +186,9 @@ async def test_get_record_turns_a_404_into_a_not_found_error(make_client):
         )
 
 
-async def test_get_record_propagates_other_api_errors(make_client, fake: FakeServiceNow):
+async def test_get_record_propagates_other_api_errors(
+    make_client, fake: FakeServiceNow
+):
     """Only 404 is reinterpreted; a 403 must not be masked as 'not found'."""
     fake.fail_next(1, status=403)
     client = make_client()
@@ -197,7 +199,9 @@ async def test_get_record_propagates_other_api_errors(make_client, fake: FakeSer
         )
 
 
-async def test_get_record_on_an_empty_result_is_not_found(make_client, fake: FakeServiceNow):
+async def test_get_record_on_an_empty_result_is_not_found(
+    make_client, fake: FakeServiceNow
+):
     fake.fail_next(1, status=200, body='{"result": {}}')
     client = make_client()
 

@@ -76,7 +76,7 @@ async def test_non_object_records_inside_the_result_list(fake, sleeper):
     fake.fail_next(1, status=200, body='{"result": [{"number": "INC1"}, "oops"]}')
     client = _client(fake, sleeper)
 
-    with pytest.raises(MalformedResponseError, match="Record 1 .* is a str"):
+    with pytest.raises(MalformedResponseError, match=r"Record 1 .* is a str"):
         await client.query_table("incident", fields=INCIDENT_SUMMARY_FIELDS, limit=1)
 
 
@@ -129,7 +129,9 @@ async def test_error_detail_is_length_capped(fake, sleeper):
 
 
 async def test_non_json_error_body_still_produces_a_typed_error(fake, sleeper):
-    fake.fail_next(1, status=502, body="<h1>502 Bad Gateway</h1>", content_type="text/html")
+    fake.fail_next(
+        1, status=502, body="<h1>502 Bad Gateway</h1>", content_type="text/html"
+    )
     client = _client(fake, sleeper, max_retries=0)
 
     with pytest.raises(ServiceNowAPIError) as excinfo:
@@ -147,14 +149,14 @@ async def test_missing_record_produces_a_clear_domain_error(make_service):
         await service.get_incident(number="INC9999999")
 
 
-async def test_create_response_without_a_record_is_flagged_as_ambiguous(
-    fake, sleeper
-):
+async def test_create_response_without_a_record_is_flagged_as_ambiguous(fake, sleeper):
     """A write that returns no body may or may not have applied. Say so."""
     fake.fail_next(1, status=201, body='{"result": null}')
     client = _client(fake, sleeper, read_only=False)
 
-    with pytest.raises(MalformedResponseError, match="may or may not have been applied"):
+    with pytest.raises(
+        MalformedResponseError, match="may or may not have been applied"
+    ):
         await client.create_record(
             "incident", {"short_description": "x"}, fields=INCIDENT_SUMMARY_FIELDS
         )
@@ -193,9 +195,7 @@ async def test_garbage_total_count_header_is_ignored(fake, sleeper):
     fake._query = wrapped  # type: ignore[method-assign]
     client = _client(fake, sleeper)
 
-    page = await client.query_table(
-        "incident", fields=INCIDENT_SUMMARY_FIELDS, limit=3
-    )
+    page = await client.query_table("incident", fields=INCIDENT_SUMMARY_FIELDS, limit=3)
 
     assert len(page.records) == 3
     assert page.total_available is None

@@ -121,18 +121,24 @@ def make_client(fake: FakeServiceNow, sleeper: RecordingSleep):
 
     def _make(**overrides: Any) -> ServiceNowClient:
         settings = make_settings(**overrides)
-        return ServiceNowClient(settings, build_transport(fake, settings, sleep=sleeper))
+        return ServiceNowClient(
+            settings, build_transport(fake, settings, sleep=sleeper)
+        )
 
     return _make
 
 
 @pytest.fixture
-def make_service(fake: FakeServiceNow, audit_stream: io.StringIO, sleeper: RecordingSleep):
+def make_service(
+    fake: FakeServiceNow, audit_stream: io.StringIO, sleeper: RecordingSleep
+):
     """Factory returning a fully wired service, with an in-memory audit sink."""
 
     def _make(**overrides: Any) -> ServiceNowService:
         settings = make_settings(**overrides)
-        client = ServiceNowClient(settings, build_transport(fake, settings, sleep=sleeper))
+        client = ServiceNowClient(
+            settings, build_transport(fake, settings, sleep=sleeper)
+        )
         audit = AuditLogger(audit_stream, actor="pytest", now=_fixed_now)
         return ServiceNowService(settings, client, audit)
 

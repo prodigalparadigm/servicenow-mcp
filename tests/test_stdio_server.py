@@ -48,7 +48,7 @@ INCIDENTS = [
 
 
 class _Handler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802 - stdlib naming
+    def do_GET(self) -> None:
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
         fields = (params.get("sysparm_fields", [""])[0]).split(",")
@@ -131,9 +131,7 @@ class StdioClient:
                 f"no reply within {self._timeout}s; stderr:\n{self.stderr()}"
             ) from None
         if line is None:
-            raise AssertionError(
-                f"server closed stdout; stderr:\n{self.stderr()}"
-            )
+            raise AssertionError(f"server closed stdout; stderr:\n{self.stderr()}")
         # Any non-JSON line on stdout is itself the failure: stdout is the
         # protocol channel and must carry nothing else.
         return json.loads(line)
@@ -143,7 +141,7 @@ class StdioClient:
         self._process.terminate()
         try:
             return self._process.stderr.read() or ""
-        except Exception:  # pragma: no cover - best effort diagnostics
+        except (OSError, ValueError):  # pragma: no cover - best-effort diagnostics
             return "<unavailable>"
 
     def request(self, method: str, params: dict | None = None) -> dict:
@@ -224,9 +222,7 @@ def test_full_stdio_session(stdio_server: StdioClient):
     # Read-only: the mutating tools must not be advertised.
     assert not ({"create_incident", "update_incident"} & names)
 
-    info = stdio_server.request(
-        "tools/call", {"name": "server_info", "arguments": {}}
-    )
+    info = stdio_server.request("tools/call", {"name": "server_info", "arguments": {}})
     body = json.loads(info["result"]["content"][0]["text"])
     assert body["read_only"] is True
 
@@ -258,11 +254,7 @@ def test_bad_configuration_exits_nonzero_without_touching_stdout():
         [sys.executable, "-m", "servicenow_mcp"],
         capture_output=True,
         text=True,
-        env={
-            k: v
-            for k, v in os.environ.items()
-            if not k.startswith("SERVICENOW_")
-        },
+        env={k: v for k, v in os.environ.items() if not k.startswith("SERVICENOW_")},
         timeout=60,
     )
     assert process.returncode == 2

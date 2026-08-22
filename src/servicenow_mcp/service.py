@@ -36,7 +36,7 @@ from .projection import (
 )
 from .query import QueryBuilder, QuerySyntaxError, sanitize_operand
 
-__all__ = ["ServiceNowService", "INCIDENT_STATES"]
+__all__ = ["INCIDENT_STATES", "ServiceNowService"]
 
 INCIDENT_TABLE: Final[str] = "incident"
 GROUP_TABLE: Final[str] = "sys_user_group"
@@ -86,7 +86,9 @@ def _normalize_state(value: str | int) -> str:
         return text
     code = INCIDENT_STATES.get(text.lower())
     if code is None:
-        known = ", ".join(sorted({k for k in INCIDENT_STATES if " " in k or k.isalpha()}))
+        known = ", ".join(
+            sorted({k for k in INCIDENT_STATES if " " in k or k.isalpha()})
+        )
         raise QuerySyntaxError(
             f"Unknown incident state {value!r}. Use a number or one of: {known}. "
             "For a customised state model, pass extra_query instead."
@@ -155,7 +157,9 @@ class ServiceNowService:
             )
 
     @staticmethod
-    def _measure(event: AuditEvent, payload: Any, *, records: int | None = None) -> None:
+    def _measure(
+        event: AuditEvent, payload: Any, *, records: int | None = None
+    ) -> None:
         """Record the size of what is about to be handed to the model."""
         event.result_records = records
         try:
@@ -233,7 +237,9 @@ class ServiceNowService:
             if state is not None:
                 builder.where("state", "=", _normalize_state(state))
             if priority is not None:
-                builder.where("priority", "=", _normalize_severity("priority", priority))
+                builder.where(
+                    "priority", "=", _normalize_severity("priority", priority)
+                )
             if assignment_group:
                 builder.where("assignment_group.name", "=", assignment_group)
             if assigned_to:
@@ -268,7 +274,7 @@ class ServiceNowService:
         spec = (order_by or "").strip()
         if not spec:
             return
-        field = spec[1:] if spec.startswith("-") else spec
+        field = spec.removeprefix("-")
         if field not in _SORTABLE_INCIDENT_FIELDS:
             raise QuerySyntaxError(
                 f"Cannot sort incidents by {field!r}. Sortable fields: "
@@ -477,7 +483,9 @@ class ServiceNowService:
 
             summary = (short_description or "").strip()
             if not summary:
-                raise QuerySyntaxError("short_description is required and may not be empty.")
+                raise QuerySyntaxError(
+                    "short_description is required and may not be empty."
+                )
 
             if correlation_id:
                 existing = await self._client.find_one(
@@ -497,7 +505,6 @@ class ServiceNowService:
                             "duplicate."
                         ),
                     }
-                    event.result_records = 1
                     self._measure(event, result, records=1)
                     return result
 
