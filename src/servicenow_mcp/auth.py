@@ -8,6 +8,7 @@ told to invalidate a token when the instance answers 401.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import time
 from abc import ABC, abstractmethod
@@ -117,13 +118,12 @@ class OAuth2ClientCredentialsProvider(AuthProvider):
 
         self._access_token: str | None = None
         self._expires_at: float = 0.0
-        #: Created lazily so the provider can be constructed off the event loop.
-        self._lock: object | None = None
+        #: Created lazily so the provider can be constructed off the event loop:
+        #: ``build_application`` runs synchronously, before any loop exists.
+        self._lock: asyncio.Lock | None = None
         self.token_requests = 0
 
-    def _get_lock(self):
-        import asyncio
-
+    def _get_lock(self) -> asyncio.Lock:
         if self._lock is None:
             self._lock = asyncio.Lock()
         return self._lock

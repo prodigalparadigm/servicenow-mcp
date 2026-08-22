@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 
 import httpx
@@ -71,12 +72,11 @@ def test_unknown_auth_mode_is_rejected():
 
 
 def test_default_oauth_token_url_is_derived_from_the_instance():
+    assert oauth_settings().resolved_oauth_token_url == f"{BASE_URL}/oauth_token.do"
     assert (
-        oauth_settings().resolved_oauth_token_url
-        == f"{BASE_URL}/oauth_token.do"
-    )
-    assert (
-        oauth_settings(oauth_token_url="https://sso.example/token").resolved_oauth_token_url
+        oauth_settings(
+            oauth_token_url="https://sso.example/token"
+        ).resolved_oauth_token_url
         == "https://sso.example/token"
     )
 
@@ -119,9 +119,7 @@ async def test_oauth_fetches_a_token_then_sends_a_bearer_header(fake, sleeper):
     assert len(fake.token_requests) == 1
     assert fake.token_requests[0]["grant_type"] == "client_credentials"
     assert fake.token_requests[0]["client_id"] == "client-abc"
-    assert (
-        fake.table_requests[0].headers["authorization"] == "Bearer fake-access-token"
-    )
+    assert fake.table_requests[0].headers["authorization"] == "Bearer fake-access-token"
 
 
 async def test_oauth_token_is_cached_across_calls(fake, sleeper):
@@ -164,6 +162,70 @@ async def test_oauth_token_is_refreshed_after_expiry(fake):
     assert provider.token_requests == 2
 
 
+async def test_concurrent_first_use_fetches_exactly_one_token():
+    """The refresh is single-flight.
+
+    Ten tool calls landing at once on a cold provider must not each open a
+    token request: ServiceNow rate-limits ``/oauth_token.do`` like any other
+    endpoint, and a thundering herd there can lock the integration out of the
+    instance entirely.
+
+    The token endpoint here deliberately takes time to answer, so every
+    coroutine is inside ``_token`` before the first one finishes. Without the
+    lock this test sees ten token requests; it is not a tautology.
+    """
+    in_flight: list[float] = []
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        in_flight.append(asyncio.get_running_loop().time())
+        await asyncio.sleep(0.05)
+        return httpx.Response(
+            200, json={"access_token": "fake-access-token", "expires_in": 1800}
+        )
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler), timeout=5.0)
+    provider = OAuth2ClientCredentialsProvider(
+        token_url=f"{BASE_URL}/oauth_token.do",
+        client_id="client-abc",
+        client_secret="client-secret",
+        http_client=http,
+    )
+
+    async def _one_call() -> str:
+        headers: dict[str, str] = {}
+        await provider.apply(headers)
+        return headers["Authorization"]
+
+    headers = await asyncio.gather(*(_one_call() for _ in range(10)))
+
+    assert len(in_flight) == 1
+    assert provider.token_requests == 1
+    assert set(headers) == {"Bearer fake-access-token"}
+
+
+async def test_invalidate_forces_exactly_one_refetch(fake):
+    http = httpx.AsyncClient(transport=fake.transport(), timeout=5.0)
+    provider = OAuth2ClientCredentialsProvider(
+        token_url=f"{BASE_URL}/oauth_token.do",
+        client_id="client-abc",
+        client_secret="client-secret",
+        http_client=http,
+    )
+    headers: dict[str, str] = {}
+    await provider.apply(headers)
+    assert provider.token_requests == 1
+
+    assert await provider.invalidate() is True
+    await provider.apply(headers)
+    assert provider.token_requests == 2
+
+
+def test_basic_auth_reports_that_reauthentication_is_pointless():
+    """A static credential must not burn a retry replaying the same header."""
+    provider = BasicAuthProvider("u", "p")
+    assert asyncio.run(provider.invalidate()) is False
+
+
 async def test_missing_expires_in_still_yields_a_usable_token(fake):
     fake.token_expires_in = None
     http = httpx.AsyncClient(transport=fake.transport(), timeout=5.0)
@@ -196,9 +258,7 @@ async def test_a_401_triggers_exactly_one_reauthentication(fake, sleeper):
 
     fake._handle_token = rotate  # type: ignore[method-assign]
 
-    page = await client.query_table(
-        "incident", fields=INCIDENT_SUMMARY_FIELDS, limit=1
-    )
+    page = await client.query_table("incident", fields=INCIDENT_SUMMARY_FIELDS, limit=1)
 
     assert len(page.records) == 1
     assert transport.stats.reauth_attempts == 1
