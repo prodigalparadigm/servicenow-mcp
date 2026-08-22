@@ -1,0 +1,46 @@
+[project]
+name = "servicenow-mcp"
+version = "0.1.0"
+description = "A Model Context Protocol server exposing ServiceNow ITSM incidents, assignment groups, and CMDB ownership to LLM clients."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Kathleen Bartin", email = "kathleen@prodigalparadigm.com" }]
+keywords = ["mcp", "servicenow", "itsm", "cmdb", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "mcp>=2.0.0,<3.0.0",
+    "httpx>=0.27,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[project.scripts]
+servicenow-mcp = "servicenow_mcp.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/comelyhunger/servicenow-mcp"
+Source = "https://github.com/comelyhunger/servicenow-mcp"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/servicenow_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
+filterwarnings = ["error::DeprecationWarning:servicenow_mcp.*"]
