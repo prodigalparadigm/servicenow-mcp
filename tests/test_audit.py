@@ -9,7 +9,7 @@ import sys
 import pytest
 
 from servicenow_mcp.audit import AuditEvent, AuditLogger, redact
-from servicenow_mcp.errors import RecordNotFoundError
+from servicenow_mcp.errors import ConfigurationError, RecordNotFoundError
 
 
 def lines(stream: io.StringIO) -> list[dict]:
@@ -78,9 +78,7 @@ async def test_failures_are_recorded_with_type_and_message(make_service, audit_s
 
 async def test_write_calls_are_audited_with_their_arguments(make_service, audit_stream):
     service = make_service(read_only=False)
-    await service.create_incident(
-        short_description="Audit me", correlation_id="corr-1"
-    )
+    await service.create_incident(short_description="Audit me", correlation_id="corr-1")
 
     entry = lines(audit_stream)[-1]
     assert entry["tool"] == "create_incident"
@@ -105,7 +103,14 @@ async def test_every_line_is_valid_standalone_json(make_service, audit_stream):
 
 @pytest.mark.parametrize(
     "key",
-    ["password", "client_secret", "api_key", "Authorization", "refresh_token", "PASSWD"],
+    [
+        "password",
+        "client_secret",
+        "api_key",
+        "Authorization",
+        "refresh_token",
+        "PASSWD",
+    ],
 )
 def test_credential_shaped_keys_are_redacted(key):
     assert redact({key: "hunter2"})[key] == "[redacted]"
@@ -177,17 +182,47 @@ def test_from_path_with_no_path_falls_back_to_stderr():
     assert AuditLogger.from_path(None)._stream is sys.stderr
 
 
-def test_a_broken_sink_never_breaks_a_tool_call():
-    class Exploding(io.StringIO):
-        def write(self, _):  # type: ignore[override]
-            raise OSError("disk full")
+class _Exploding(io.StringIO):
+    """A sink that fails the way a full disk or a revoked permission does."""
 
-    AuditLogger(Exploding()).emit(AuditEvent(tool="t", actor="a"))
+    def write(self, _: str) -> int:  # type: ignore[override]
+        raise OSError("No space left on device")
 
 
-async def test_nothing_is_written_to_stdout_during_a_tool_call(
-    make_service, capsys
-):
+def test_a_broken_sink_is_counted_not_swallowed(capsys):
+    logger = AuditLogger(_Exploding())
+
+    logger.emit(AuditEvent(tool="t", actor="a"))
+    logger.emit(AuditEvent(tool="t", actor="a"))
+
+    # The failure is visible: counted, and reported to stderr exactly once so a
+    # persistently broken sink cannot itself become the flood.
+    assert logger.dropped_events == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.count("audit sink failed") == 1
+    assert "No space left on device" in captured.err
+
+
+async def test_a_broken_sink_never_breaks_a_tool_call(make_service):
+    service = make_service()
+    service._audit = AuditLogger(_Exploding())
+
+    result = await service.search_incidents(limit=2)
+
+    assert len(result["incidents"]) == 2
+    assert service._audit.dropped_events == 1
+
+
+def test_an_unopenable_audit_path_fails_at_startup(tmp_path):
+    """Degrading silently to stderr would hide that the file is never written."""
+    unwritable = tmp_path / "no-such-dir" / "audit.jsonl"
+
+    with pytest.raises(ConfigurationError, match="could not be opened"):
+        AuditLogger.from_path(str(unwritable))
+
+
+async def test_nothing_is_written_to_stdout_during_a_tool_call(make_service, capsys):
     service = make_service()
     await service.search_incidents(limit=2)
     assert capsys.readouterr().out == ""

@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import IO, Any, Final
 
+from .errors import ConfigurationError
+
 __all__ = ["AuditEvent", "AuditLogger", "redact"]
 
 #: Substring match, case-insensitive. Broad on purpose: a false positive costs
@@ -162,29 +164,55 @@ class AuditLogger:
         self._actor = actor
         self._clock = clock
         self._now = now or (lambda: datetime.now(UTC))
+        #: Records the sink refused. Non-zero means the audit trail has holes.
+        self.dropped_events = 0
 
     @classmethod
-    def from_path(
-        cls, path: str | None, *, actor: str = "mcp-client"
-    ) -> AuditLogger:
-        """Open a file sink, or fall back to stderr when ``path`` is empty."""
+    def from_path(cls, path: str | None, *, actor: str = "mcp-client") -> AuditLogger:
+        """Open a file sink, or fall back to stderr when ``path`` is empty.
+
+        Raises:
+            ConfigurationError: the path cannot be opened for append. This is
+                deliberately fatal at startup: silently degrading to stderr
+                would leave an operator believing writes are being recorded to
+                a file that never gets one.
+        """
         if not path:
             return cls(actor=actor)
-        # Line-buffered append: an audit trail that is lost on crash is not an
-        # audit trail.
-        # Not a context manager on purpose: the handle lives for the life of
-        # the process. buffering=1 is line buffering -- an audit trail lost in
-        # a buffer on crash is not an audit trail.
-        handle = open(path, "a", encoding="utf-8", buffering=1)  # noqa: SIM115
+        try:
+            # ``buffering=1`` is line buffering, and the handle deliberately
+            # outlives this call: it lives for the life of the process. An
+            # audit trail still sitting in a buffer when the process dies is
+            # not an audit trail.
+            handle = open(path, "a", encoding="utf-8", buffering=1)  # noqa: SIM115
+        except OSError as exc:
+            raise ConfigurationError(
+                f"SERVICENOW_AUDIT_LOG_PATH {path!r} could not be opened for "
+                f"append: {exc}. Fix the path, or unset it to log to stderr."
+            ) from exc
         return cls(handle, actor=actor)
 
     def emit(self, event: AuditEvent) -> None:
-        """Write one record. Logging failures never break a tool call."""
+        """Write one record.
+
+        A failing sink must not fail the tool call it describes -- but it must
+        not disappear either. Failures are counted on :attr:`dropped_events`,
+        and the first one is reported once on stderr, so a full disk or a
+        revoked file permission surfaces somewhere a human will see it instead
+        of silently thinning the audit trail.
+        """
         try:
             self._stream.write(event.to_json(timestamp=self._now().isoformat()) + "\n")
             self._stream.flush()
-        except Exception:  # pragma: no cover - defensive
-            pass
+        except Exception as exc:  # noqa: BLE001 - a broken sink must not break the call
+            self.dropped_events += 1
+            if self.dropped_events == 1 and self._stream is not sys.stderr:
+                print(
+                    f"servicenow-mcp: audit sink failed "
+                    f"({type(exc).__name__}: {exc}); audit records are being "
+                    "dropped. Subsequent failures are counted, not reported.",
+                    file=sys.stderr,
+                )
 
     @asynccontextmanager
     async def tool_call(
