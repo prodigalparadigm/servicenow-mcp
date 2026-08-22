@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.config import ABSOLUTE_MAX_RECORDS, Settings
+from servicenow_mcp.config import (
+    ABSOLUTE_MAX_RECORDS,
+    ABSOLUTE_MAX_RETRIES,
+    Settings,
+)
 from servicenow_mcp.errors import ConfigurationError
 from servicenow_mcp.projection import INCIDENT_SUMMARY_FIELDS
 
@@ -13,7 +17,9 @@ from .conftest import build_transport, make_settings
 from .fake_servicenow import FakeServiceNow, make_incidents
 
 
-async def test_absurd_limit_is_clamped_to_max_records(make_client, fake: FakeServiceNow):
+async def test_absurd_limit_is_clamped_to_max_records(
+    make_client, fake: FakeServiceNow
+):
     client = make_client(max_records=10, page_size=5)
     page = await client.query_table(
         "incident", fields=INCIDENT_SUMMARY_FIELDS, limit=50_000
@@ -56,9 +62,9 @@ async def test_page_size_never_exceeds_the_cap(make_client, fake: FakeServiceNow
     )
 
     assert len(page.records) == 3
-    assert all(
-        (r.int_param("sysparm_limit") or 0) <= 4 for r in fake.table_requests
-    ), [r.int_param("sysparm_limit") for r in fake.table_requests]
+    assert all((r.int_param("sysparm_limit") or 0) <= 4 for r in fake.table_requests), [
+        r.int_param("sysparm_limit") for r in fake.table_requests
+    ]
 
 
 async def test_service_surfaces_the_cap_to_the_model(make_service):
@@ -93,3 +99,19 @@ def test_config_rejects_a_zero_cap():
             password="p",
             max_records=0,
         )
+
+
+def test_config_rejects_an_unbounded_retry_budget():
+    """A budget outlasting the client's own timeout reads as a hang, not resilience."""
+    with pytest.raises(ConfigurationError, match="MAX_RETRIES may not exceed"):
+        make_settings(max_retries=ABSOLUTE_MAX_RETRIES + 1)
+
+
+def test_config_rejects_a_backoff_ceiling_below_its_floor():
+    with pytest.raises(ConfigurationError, match="RETRY_MAX_DELAY may not be below"):
+        make_settings(retry_base_delay=10.0, retry_max_delay=1.0)
+
+
+def test_config_rejects_a_page_size_above_its_own_ceiling():
+    with pytest.raises(ConfigurationError, match="PAGE_SIZE may not exceed"):
+        make_settings(page_size=200, max_page_size=100)

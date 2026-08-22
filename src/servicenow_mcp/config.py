@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 from .errors import ConfigurationError
 
-__all__ = ["AuthMode", "Settings"]
+__all__ = ["ABSOLUTE_MAX_RECORDS", "ABSOLUTE_MAX_RETRIES", "AuthMode", "Settings"]
 
 _LOCAL_HOSTS: Final[frozenset[str]] = frozenset({"localhost", "127.0.0.1", "::1"})
 _TRUE: Final[frozenset[str]] = frozenset({"1", "true", "yes", "on"})
@@ -26,6 +26,11 @@ _FALSE: Final[frozenset[str]] = frozenset({"0", "false", "no", "off"})
 #: cap to a silly number cannot make a single tool call return more than this;
 #: the point of the cap is to bound model context, not just network traffic.
 ABSOLUTE_MAX_RECORDS: Final[int] = 5_000
+
+#: Absolute ceiling on ``SERVICENOW_MAX_RETRIES``. An MCP client is waiting
+#: synchronously on every tool call, so a retry budget large enough to outlast
+#: the client's own timeout buys nothing and looks like a hang.
+ABSOLUTE_MAX_RETRIES: Final[int] = 10
 
 
 class AuthMode(StrEnum):
@@ -57,7 +62,9 @@ def _get_bool(env: Mapping[str, str], key: str, default: bool) -> bool:
     )
 
 
-def _get_int(env: Mapping[str, str], key: str, default: int, *, minimum: int = 0) -> int:
+def _get_int(
+    env: Mapping[str, str], key: str, default: int, *, minimum: int = 0
+) -> int:
     raw = _get(env, key)
     if raw is None:
         return default
@@ -169,6 +176,16 @@ class Settings:
             )
         if self.timeout_seconds <= 0:
             raise ConfigurationError("SERVICENOW_TIMEOUT_SECONDS must be > 0")
+        if self.max_retries > ABSOLUTE_MAX_RETRIES:
+            raise ConfigurationError(
+                f"SERVICENOW_MAX_RETRIES may not exceed {ABSOLUTE_MAX_RETRIES}"
+            )
+        if self.retry_max_delay < self.retry_base_delay:
+            raise ConfigurationError(
+                "SERVICENOW_RETRY_MAX_DELAY may not be below "
+                "SERVICENOW_RETRY_BASE_DELAY; the ceiling would clamp every "
+                "backoff to the same value and defeat the jitter."
+            )
 
     # -- derived --------------------------------------------------------
 
