@@ -17,8 +17,11 @@ git clone <this repo> && cd servicenow-mcp
 uv venv --python 3.12 && source .venv/bin/activate
 uv pip install -e ".[dev]"
 
-# Run the full test suite. No credentials, no network.
+# 222 tests. No credentials, no network, no live instance.
 pytest
+
+# The same checks that gate a change here.
+ruff check . && ruff format --check . && mypy
 ```
 
 To point it at a real instance:
@@ -107,6 +110,12 @@ Tests inject an in-memory ServiceNow as an `httpx` transport, so the production 
 
 ## Limitations
 
+- **Not verified against a live instance.** The suite runs against an in-memory
+  fake built to the documented Table API contract, which is what makes it run
+  offline -- but a fake agrees with its author, not with production. The two
+  likeliest divergences are ACL evaluation, which silently removes rows and
+  columns rather than erroring, and instances whose state or priority model has
+  been customised away from the out-of-box values.
 - **Incidents only, plus two lookup tables.** No changes, problems, requests, catalog items, or knowledge articles. No attachments. The client is generic over tables, but the tools, projections, and state mappings are incident-specific.
 - **State and priority mappings assume the out-of-box model.** An instance with a customised state model needs `extra_query`, or a change to `INCIDENT_STATES`.
 - **`search_incidents` text matching is `LIKE` on `short_description`.** Not the indexed full-text search (`123TEXTQUERY321`), which behaves differently across instances and isn't portable enough to expose blindly.
@@ -114,7 +123,7 @@ Tests inject an in-memory ServiceNow as an `httpx` transport, so the production 
 - **The rate limiter is per-process and in-memory.** Several server instances against one account will collectively exceed the configured rate; the 429 handling is the backstop, not the limiter.
 - **No streaming or partial results.** A capped call returns its records and a `next_offset`; it does not stream.
 - **Only stdio transport is wired up.** The SDK also supports SSE and streamable HTTP; those would need auth and CORS decisions that depend on the deployment.
-- **The fake backend implements a useful subset, not all of ServiceNow.** Notably it has no ACL evaluation, no business rules, and a one-hop dotted reference walk.
+- **The fake backend implements a useful subset, not all of ServiceNow.** It covers encoded-query evaluation, pagination headers, field projection, both auth modes, and a scriptable fault queue -- but no business rules, and only a one-hop dotted reference walk.
 
 ## License
 
