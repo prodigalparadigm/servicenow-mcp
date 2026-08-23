@@ -22,10 +22,10 @@ jobs:
       # No credentials and no network reachability are configured here on
       # purpose: if a test needs a live instance, it has to fail in CI.
       - name: Test
-        run: uv run python -m pytest
+        run: .venv/bin/python -m pytest
 
       - name: Lint
-        run: uv run ruff check . && uv run ruff format --check .
+        run: .venv/bin/ruff check . && .venv/bin/ruff format --check .
 
       - name: Types
-        run: uv run mypy
+        run: .venv/bin/mypy
