@@ -118,6 +118,10 @@ Tests inject an in-memory ServiceNow as an `httpx` transport, so the production 
 - **Only stdio transport is wired up.** The SDK also supports SSE and streamable HTTP; those would need auth and CORS decisions that depend on the deployment.
 - **The fake backend implements a useful subset, not all of ServiceNow.** It covers encoded-query evaluation, pagination headers, field projection, both auth modes, and a scriptable fault queue — but no business rules, and only a one-hop dotted reference walk.
 
+## Authorship
+
+Kathleen Bartin, with Claude. Co-authored at Prodigal Paradigm LLC in August 2026 using Claude Code: the design decisions, the tests, and this README were produced together. The co-byline is the house standard, not small print.
+
 ## License
 
 MIT. Copyright (c) 2026 Kathleen Bartin. See [LICENSE](LICENSE).
