@@ -14,10 +14,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # setup-uv with python-version already created and activated .venv;
+      # install into it. (--system targets the runner's externally managed
+      # interpreter and fails; a second `uv venv` collides with this one.)
       - name: Install
-        run: |
-          uv venv --python 3.12
-          uv pip install -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       # No credentials and no network reachability are configured here on
       # purpose: if a test needs a live instance, it has to fail in CI.
